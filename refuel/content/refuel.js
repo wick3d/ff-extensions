@@ -60,6 +60,7 @@ var StRFBrowserListener = {
 };
 
 var refuel = {
+    enabled: true,
     oldURL: null,
     appcontent: null,
     doc: null,
@@ -72,7 +73,7 @@ var refuel = {
 
     init: function(e)
     {
-        timeLine.log("init() called");
+        STRF_TIMELINE.log("init() called");
         
         STRF_LOADER.loadSubScript("chrome://refuel/content/utils.js");
         STRF_LOADER.loadSubScript("chrome://refuel/content/imagefinder.js");
@@ -111,7 +112,7 @@ var refuel = {
         this.localstorage = new StRFLocalStorage(STRF_EXT_PREFERENCES.getCharPref("apikey"));
         this.localstorage.init();
         
-        timeLine.log("init() done");
+        STRF_TIMELINE.log("init() done");
     },
     uninit: function(e)
     {
@@ -161,6 +162,10 @@ var refuel = {
     {
         STRF_LOG("ProcessNewURL: "+aURI.spec);
         
+        if (! this.enabled) {
+            return;
+        }
+        
         if (aURI.spec == this.oldURL) {
             return;
         }
@@ -171,6 +176,10 @@ var refuel = {
     },
     onPageLoad: function(e)
     {
+        if (! this.enabled) {
+            return;
+        }
+        
         if (e.originalTarget instanceof HTMLDocument)
         {
             this.doc = e.originalTarget;
@@ -295,6 +304,13 @@ var refuel = {
     {
         //imagebanner.onMenuItemCommand(e);
     },
+    toggleStatus: function(e)
+    {
+        this.enabled = !this.enabled;
+		STRF_EXT_PREFERENCES.setBoolPref('enabled', this.enabled);
+
+		this._updateStatusImage();
+    },
     banImage: function(e)
     {
         dump("banImage:\n");
@@ -302,6 +318,13 @@ var refuel = {
             dump("key: "+key+"\n");
             dump(e[key]+"\n");
         }
+    },
+    _updateStatusImage: function()
+    {
+        document.getElementById('refuelStatusBarPanelImage').setAttribute(
+			'src',
+			'chrome://refuel/skin/status-' + (this.enabled ? 'on' : 'off') + '.png'
+		);
     }
 };
 window.addEventListener("load", function(e) { refuel.init(e); }, false);
@@ -321,7 +344,7 @@ function STRF_LOG(text)
  * Time logging module, used to measure startup time.
  * @class
  */
-var timeLine = {
+var STRF_TIMELINE = {
     _lastTimeStamp: null,
 
     /**
@@ -340,6 +363,6 @@ var timeLine = {
         let padding = [];
         for (var i = msg.toString().length; i < 40; i++) padding.push(" ");
         
-        dump("IB timeline: " + msg + padding.join("") + "\t (" + diff + ")\n");
+        dump("STRF timeline: " + msg + padding.join("") + "\t (" + diff + ")\n");
     }
 };
