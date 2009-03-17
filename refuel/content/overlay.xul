@@ -63,5 +63,14 @@
             </menupopup>
         </menu>
     </popup>
+    
+    <statusbar id='refuelStatusBar'>
+    	<statusbarpanel id='refuelStatusBarPanel' insertafter='livemark-button'>
+    		<image id='refuelStatusBarPanelImage' width='16' height='16'
+    			src='chrome://refuel/skin/status-on.png'
+    			onclick="refuel.toggleStatus();"
+    		/>
+    	</statusbarpanel>
+    </statusbar>
 
 </overlay>
