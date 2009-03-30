@@ -9,51 +9,49 @@ var StRFImageFinder = {
     allImages: null,
     imageDatas: null,
     
-    findAll: function(hash_prefix)
+    findAll: function(referer_hash, referer_url)
     {
         var self = this;
         
-        this.hash_prefix = hash_prefix;
+        this.referer_hash = referer_hash;
         this.allImages = [];
         this.imageDatas = [];
         this.documentList = this._getDocuments(gBrowser.browsers[gBrowser.mTabBox.selectedIndex].contentWindow, new Array());
         
-        for (i=0; i<this.documentList.length; i++)
+        for (let [i, dl] in Iterator(this.documentList))
         {
-    		documentImageList = this.documentList[i].getElementsByTagName('img');
-
-            for (j=0; j<documentImageList.length; j++) {
-                this.allImages.push(documentImageList[j]);
-            }
-        }
-        
-    	for (let [i, dl] in Iterator(this.documentList))
-    	{
-    	    dlImages = dl.getElementsByTagName('img');
-    	    for (j=0; j<dlImages.length; j++) {
+            dlImages = dl.images;
+            for (j=0; j<dlImages.length; j++) {
                 self.allImages.push(dlImages[j]);
             }
-	    }
+        }
         
         if (this.allImages.length == 0) {
             return this.imageDatas;
         }
         
-    	this.allImages = this._cleanUp(this.allImages);
+    	//this.allImages = this._cleanUp(this.allImages);
+    	
+    	STRF_LOG('IF this.allImages.length:'+this.allImages.length);
     	
     	for (let [i, image] in Iterator(this.allImages))
     	{
+    	    if (!image.src) {
+    	        continue;
+    	    }
     	    var src = image.src;
     	    var name = src.substring(src.lastIndexOf('/') + 1, src.length);
     	    
     	    var imageData = {
+    	        refererhash: this.referer_hash,
+    	        refererurl: this.referer_url,
     	        image: image,
     	        src: src,
     	        name: name,
     	        ext: name.substring(name.lastIndexOf('.') + 1, name.length).toLowerCase(),
     	        file: null,
     	        filesize: null,
-    	        hash: StRFUtils.md5_encode(self.hash_prefix + src)
+    	        hash: StRFUtils.md5_encode(src)
     	    };
     	    
     	    try {
@@ -86,11 +84,11 @@ var StRFImageFinder = {
     {
         let framesList = frame.frames;
 
-        if (framesList.length == 0) {
-    	    documentList.push(frame.document);
-    	} else {
+        documentList.push(frame.document);
+        
+    	if (framesList.length > 0) {
     	    for (i=0; i < framesList.length; i++) {
-    		    documentList.push(framesList[i].document);
+                this._getDocuments(framesList[i], documentList);
     	    }
     	}
 
@@ -99,6 +97,7 @@ var StRFImageFinder = {
     _cleanUp: function(list)
     {
         STRF_LOG("Cleanup");
+        
         let cleanedList = [];
         list.sort(this._itemSorter);
         
