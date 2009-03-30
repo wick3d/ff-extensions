@@ -1,21 +1,5 @@
-const STRF_DIRSERVICE = Components.classes["@mozilla.org/file/directory_service;1"]
-    .getService(Components.interfaces.nsIProperties);
-//new Components.Constructor("@mozilla.org/file/directory_service;1","nsIProperties");
-
-const STRF_LOCALFILE = Components.classes["@mozilla.org/file/local;1"];
-const STRF_FOSTREAM = Components.classes["@mozilla.org/network/file-output-stream;1"];
-
 const STRF_STORAGESERVICE = Components.classes["@mozilla.org/storage/service;1"]
     .getService(Components.interfaces.mozIStorageService);
-
-
-var sep = '/';
-if ((STRF_DIRSERVICE).get("ProfD", Components.interfaces.nsIFile).path.search(/\\/) != -1)  {
-	sep = "\\";
-} else {
-	sep = "/";
-}
-const STRF_FILE_SEPARATOR = sep;
 
 var StRFLocalStorage = function(apikey)
 {
@@ -24,8 +8,10 @@ var StRFLocalStorage = function(apikey)
     var _tables = {
         images: {
             since_version: '0.2',
-            schema: 'id INTEGER PRIMARY KEY, hash LONGVARCHAR, src LONGVARCHAR, imagesize VARCHAR, reporter_id INTEGER DEFAULT 0 NOT NULL, reporter_name VARCHAR',
-            schema_updates: null
+            schema: 'id INTEGER PRIMARY KEY, hash LONGVARCHAR, src LONGVARCHAR, weight INTEGER DEFAULT 0 NOT NULL, reporter_name VARCHAR'//,
+            // schema_updates: {
+            //     '0.3': 'DROP COLUMN reporter_id'
+            // }
         }
     };
     
@@ -38,22 +24,22 @@ var StRFLocalStorage = function(apikey)
 
         init: function()
         {
-            STRF_TIMELINE.log("StRFLocalStorage::init() called");
+            if (this.storage !== null) {
+                STRF_LOG("StRFLocalStorage already inited!");
+                return;
+            }
             
-            // this.storage_file = STRF_LOCALFILE.createInstance(Components.interfaces.nsILocalFile);        
-            // this.storage_file.initWithPath(STRF_EXT_PATH + STRF_FILE_SEPARATOR + "chrome" + STRF_FILE_SEPARATOR + this.storage_filename);
+            STRF_TIMELINE.log("StRFLocalStorage::init() called");
             
             this.storage_file = STRF_DIRSERVICE.get("ProfD", Components.interfaces.nsIFile);
             this.storage_file.append(this.storage_filename);
             
             STRF_LOG('storage_file path: '+this.storage_file.path);
             
-            this.storage = STRF_STORAGESERVICE.openDatabase(this.storage_file);            
-            this._prepareDatabase();
-            
+            this.storage = STRF_STORAGESERVICE.openDatabase(this.storage_file);
             STRF_TIMELINE.log("StRFLocalStorage::init() finished");
         },
-        _prepareDatabase: function()
+        prepareDatabase: function()
         {            
             for (var tablename in _tables)
             {
@@ -62,7 +48,7 @@ var StRFLocalStorage = function(apikey)
                 if (! this.storage.tableExists(tablename)) {
                     STRF_LOG('table '+tablename+' does not exist. Create it now.');
                     
-                    var status = this._create_table(tablename, _tables[tablename].schema);                    
+                    var status = this._createTable(tablename, _tables[tablename].schema);                    
                     //TODO: IF status == -1, execute later
                     
                     STRF_LOG('Created table with status: '+status);
@@ -70,10 +56,8 @@ var StRFLocalStorage = function(apikey)
                     STRF_LOG('table '+tablename+' exists. Check for version.');
                 }
             }
-
-            // this.storage.executeSimpleSQL("CREATE TABLE images ()");
         },
-        _create_table: function(name, schema)
+        _createTable: function(name, schema)
         {
             if (this.storage.transactionInProgress) {
                 return -1;
@@ -99,23 +83,27 @@ var StRFLocalStorage = function(apikey)
                 return false;
             }
             
-            if (typeof data.hash == 'undefined' || typeof data.src == 'undefined' || typeof data.imagesize == 'undefined') {
+            if (typeof data.hash == 'undefined' || typeof data.src == 'undefined') {
                 return false;
             }
 
-            if (typeof data.reporter !== 'object' || typeof data.reporter.id == 'undefined' || typeof data.reporter.name == 'undefined') {
+            if (typeof data.reporter !== 'object' || typeof data.reporter.name == 'undefined') {
                 return false;
             }
             
-            var statement = this.storage.createStatement("INSERT INTO images (hash, src, imagesize, reporter_id, reporter_name) VALUES(?1, ?2, ?3, ?4, ?5)");
+            weight = 0;
+            if (typeof data.weight !== 'undefined') {
+                weight = data.weight;
+            }
+            
+            var statement = this.storage.createStatement("INSERT INTO images (hash, src, weight, reporter_name) VALUES (?1, ?2, ?3, ?4)");
             statement.bindUTF8StringParameter(0, data.hash);
             statement.bindUTF8StringParameter(1, data.src);
-            statement.bindUTF8StringParameter(2, data.imagesize);
-            statement.bindInt32Parameter(3, data.reporter.id);
-            statement.bindUTF8StringParameter(4, data.reporter.name);
+            statement.bindInt32Parameter(2, weight);
+            statement.bindUTF8StringParameter(3, data.reporter.name);
             
             try {
-                var status = this._execute_statement(statement);
+                var status = this._executeStatement(statement);
                 //TODO: IF status == -1, execute later
             } finally {
                 statement.reset();
@@ -126,7 +114,7 @@ var StRFLocalStorage = function(apikey)
             
             return status;
         },
-        _execute_statement: function(statement)
+        _executeStatement: function(statement)
         {
             if (this.storage.transactionInProgress) {
                 return -1;
@@ -167,25 +155,54 @@ var StRFLocalStorage = function(apikey)
             
             STRF_LOG("Found image with hash "+hash+". (ID: "+image_id+")");
             
-            return true;
-        },
-        _load: function()
-        {
-            // var ids = "3,21,72,89";
-            // var sql = "DELETE FROM table WHERE id IN ( "+ ids +" )";
+            var status = this.storage.executeSimpleSQL("DROP FROM images WHERE id = "+image_id);
             
-            // while (statement.executeStep()) {
-            //   var value = statement.getInt32(0); // use the correct function!
-            //   // use the value...
-            // }
-            //
+            STRF_LOG("Removed ban "+image_id+" with status "+status);
+            
+            return status;
         },
-        _save: function()
+        checkForMatches: function(images, callback)
         {
-            // let fo_stream = STRF_FOSTREAM.createInstance(Components.interfaces.nsIFileOutputStream);
-            // // use 0x02 | 0x10 to open file for appending.
-            // fo_stream.init(storage, 0x02 | 0x08 | 0x20, 0666, 0);
-    		// write, create, truncate
+            STRF_LOG("StRFLocalStorage::checkForMatches");
+            
+            //TODO: Check for matches
+            
+            var self = this;
+            var data = [];
+            
+            var hash_arr = new Array();
+            for (let [i, imgData] in Iterator(images)) {
+                hash_arr.push(imgData.hash);
+            }
+            
+            var hash_str = hash_arr.join("','");
+            
+            var sql = "SELECT id,hash,weight,reporter_name FROM images WHERE hash IN ('"+hash_str+"')";
+            
+            STRF_LOG('checkForMatches sql: '+sql);
+            
+            var statement = this.storage.createStatement(sql);
+            
+            try {
+                while (statement.executeStep()) {
+                    data.push({
+                        id: statement.getInt32(0),
+                        hash: statement.getUTF8String(1),
+                        weight: statement.getInt32(2),
+                        reporter_name: statement.getUTF8String(3)
+                    });
+                }
+            } finally {
+                statement.reset();
+            }
+            
+            if (callback !== undefined) {
+                if (typeof callback == 'object') {                         
+                    callback[1].apply(callback[0], [data, status]);
+                } else {
+                    callback.apply(callback, [data, status]);
+                }
+            }
         }
     };
 }
