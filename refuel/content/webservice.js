@@ -1,4 +1,4 @@
-const STRF_WEBSERVICE_URL = "http://imagebanner/api/";
+const STRF_WEBSERVICE_URL = "http://refuel.nemein.net/tehdas/api/";
 const STRF_WEBSERVICE_PORT = 80;
 
 // const STRF_NATIVEJSON = Components.classes["@mozilla.org/dom/json;1"]
@@ -7,43 +7,6 @@ const STRF_XMLSERIALIZER = Components.classes["@mozilla.org/xmlextras/xmlseriali
     .createInstance(Components.interfaces.nsIDOMSerializer);
 const STRF_XMLPARSER = Components.classes["@mozilla.org/xmlextras/domparser;1"]
     .createInstance(Components.interfaces.nsIDOMParser);
-
-var StRFHTTPRequestObserver =
-{
-    observe: function(subject, topic, data)
-    {
-        if (topic == "http-on-modify-request")
-        {
-            var httpChannel = subject.QueryInterface(Components.interfaces.nsIHttpChannel);
-            // httpChannel.setRequestHeader("X-Hello", "World", false);
-            STRF_LOG("URI: " + httpChannel.originalURI.spec);
-            STRF_LOG("User-Agent: " + httpChannel.getRequestHeader('user-agent'));
-            dump(data);
-        }
-        if (topic == "http-on-examine-response")
-        {
-            var httpChannel = aSubject.QueryInterface(Components.interfaces.nsIHttpChannel);
-            STRF_LOG("Date: " + httpChannel.getResponseHeader('date'));
-        }
-    },
-
-    get observerService() {
-        return Components.classes["@mozilla.org/observer-service;1"]
-                 .getService(Components.interfaces.nsIObserverService);
-    },
-
-    register: function()
-    {
-        this.observerService.addObserver(this, "http-on-examine-response", false);
-        this.observerService.addObserver(this, "http-on-modify-request", false);
-    },
-
-    unregister: function()
-    {
-        this.observerService.removeObserver(this, "http-on-examine-response");
-        this.observerService.removeObserver(this, "http-on-modify-request");
-    }
-};
 
 function StRWEvaluateXPath(aNode, aExpr)
 {
@@ -75,19 +38,6 @@ var StRFWebservice = function(apikey) {
             var listener = {
                 finished : function(data, status)
                 {
-                    //STRF_LOG("status: "+status);
-                    // dump("data: ");
-                    // dump(data);     
-                    //dump(STRF_NATIVEJSON.decode(data));
-                    
-                    // var xml = STRF_XMLSERIALIZER.serializeToString(data);
-                    // dump(xml);
-                    // dump("parsed: \n");
-                    // var doc = STRF_XMLPARSER.parseFromString(xml, "text/xml");
-                    // dump(doc.documentElement.nodeName == "parsererror" ? "error while parsing" : doc.documentElement.nodeName);
-                    // 
-                    // dump("\nhas images: ");
-                    
                     var results = StRWEvaluateXPath(data, "//has_images");                    
                     var attr_results = StRWEvaluateXPath(results[0], "//@page");
                     if (results[0].textContent == 1)
@@ -96,17 +46,10 @@ var StRFWebservice = function(apikey) {
                     } else {
                         STRF_LOG("doesn't have images for page: "+attr_results[0].textContent);
                     }
-                    
-                    // var has_images_e = data.getElementsByTagName("has_images");                    
-                    // if (has_images_e[0].textContent == 1) {
-                    //     STRF_LOG("has images for page: "+has_images_e[0].attributes.getNamedItem("page").textContent);
-                    // }
                 }
             };
             
-            //StRFHTTPRequestObserver.register();
             this._executeRequest(this._generateRequestUrl('hasPage', [page_hash]), listener);
-            //StRFHTTPRequestObserver.unregister();
         },
         getDataForPage: function(page_hash, callback)
         {
@@ -126,9 +69,7 @@ var StRFWebservice = function(apikey) {
                 }
             };
             
-            StRFHTTPRequestObserver.register();
             this._executeRequest(this._generateRequestUrl('images', [page_hash, 'list']), listener);
-            StRFHTTPRequestObserver.unregister();
         },
         checkForMatches: function (images, callback)
         {
@@ -137,11 +78,7 @@ var StRFWebservice = function(apikey) {
             var self = this;
             var listener = {
                 finished: function(data, status)
-                {
-                    // dump(data.documentElement.nodeName == "parsererror" ? "error while parsing\n" : data.documentElement.nodeName+"\n");                    
-                    // var debug = StRWEvaluateXPath(data, "//debug").textContent;
-                    // dump("debug: "+debug+"\n");
-                    
+                {                    
                     if (callback !== undefined) {
                         if (typeof callback == 'object') {                         
                             callback[1].apply(callback[0], [data, status]);
@@ -164,6 +101,30 @@ var StRFWebservice = function(apikey) {
             this._executeRequest(this._generateRequestUrl('images', ['check']), listener, 'post', {
                 images: hashes
             });
+        },
+        reportImage: function(image_data, callback)
+        {
+            STRF_LOG("Webservice::reportImage");
+            
+            var self = this;
+            var listener = {
+                finished: function(data, status)
+                {      
+                    var xml = STRF_XMLSERIALIZER.serializeToString(data);
+                    dump('xml: '+xml+"\n");
+                    dump(data.documentElement.nodeName == "parsererror" ? "error while parsing\n" : data.documentElement.nodeName+"\n");
+                    
+                    if (callback !== undefined) {
+                        if (typeof callback == 'object') {                         
+                            callback[1].apply(callback[0], [data, status]);
+                        } else {
+                            callback.apply(callback, [data, status]);
+                        }
+                    }
+                }
+            };
+            
+            this._executeRequest(this._generateRequestUrl('report'), listener, 'post', image_data);
         },
         _generateRequestUrl: function(action, attrs)
         {
@@ -243,6 +204,9 @@ var StRFWebservice = function(apikey) {
                         listener.finished(req.responseXML, req.status);                     
                     } else {
                         dump("Error loading page\n");
+                        dump(req.status+"\n");
+                        dump(req.responseXML+"\n");
+                        dump(req.responseText+"\n");
                     }
                 }  
             };
