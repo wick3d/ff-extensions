@@ -1,0 +1,19 @@
+.refuel_banned_image {
+    position: relative;
+    color: #000;
+    overflow: hidden;
+    border: 1px solid #3c3c3c;
+    background: #fff url(chrome://refuel/skin/RE_48x48_green.png) no-repeat bottom center;    
+}
+.refuel_banned_image .refuel_banned_image_banner {
+    margin: 5px;
+    text-align: center;
+}
+.refuel_banned_image .refuel_banned_image_banner .refuel_banned_image_banner_name {    
+}
+.refuel_banned_image .refuel_banned_image_banner .refuel_banned_image_banner_weight {
+}
+.refuel_banned_image .refuel_banned_image_banner .refuel_banned_image_banner_date {
+}
+.refuel_banned_image .refuel_banned_image_banner .refuel_banned_image_banner_link {
+}

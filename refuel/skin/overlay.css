@@ -1,5 +1,13 @@
-/* This is just an example.  You shouldn't do this. */
-#refuel-hello
-{
-  color: red ! important;
+@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+
+/*#ctx-refuel-main-ban {
+  list-style-image: url("RE_16x16_green.png");
+  -moz-image-region: rect(0px, 16px, 16px, 0px);
+}*/
+
+#refuelStatusBarPanel #ctx-refuel-main-ban {
+    list-style-image: url(chrome://refuel/skin/RE_16x16_green.png);
+}
+#refuelStatusBarPanel[disabled="true"] #ctx-refuel-main-ban {
+    list-style-image: url(chrome://refuel/skin/RE_16x16_gray.png);
 }
