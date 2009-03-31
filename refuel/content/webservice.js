@@ -1,14 +1,12 @@
 const STRF_WEBSERVICE_URL = "http://refuel.nemein.net/tehdas/api/";
 const STRF_WEBSERVICE_PORT = 80;
 
-// const STRF_NATIVEJSON = Components.classes["@mozilla.org/dom/json;1"]
-//     .createInstance(Components.interfaces.nsIJSON);
 const STRF_XMLSERIALIZER = Components.classes["@mozilla.org/xmlextras/xmlserializer;1"]
     .createInstance(Components.interfaces.nsIDOMSerializer);
 const STRF_XMLPARSER = Components.classes["@mozilla.org/xmlextras/domparser;1"]
     .createInstance(Components.interfaces.nsIDOMParser);
 
-function StRWEvaluateXPath(aNode, aExpr)
+function StRFEvaluateXPath(aNode, aExpr)
 {
     var xpe = new XPathEvaluator();
     var nsResolver = xpe.createNSResolver(aNode.ownerDocument == null ? aNode.documentElement : aNode.ownerDocument.documentElement);
@@ -21,7 +19,6 @@ function StRWEvaluateXPath(aNode, aExpr)
     return found;
 }
 
-
 var StRFWebservice = function(apikey) {
     var _apikey = apikey;
     
@@ -30,6 +27,7 @@ var StRFWebservice = function(apikey) {
         {
             STRF_LOG("Webservice init with apikey "+_apikey);
         },
+        /*
         hasDataForPage: function(page_hash, callback)
         {
             STRF_LOG("Webservice::hasDataForPage "+page_hash);
@@ -38,8 +36,8 @@ var StRFWebservice = function(apikey) {
             var listener = {
                 finished : function(data, status)
                 {
-                    var results = StRWEvaluateXPath(data, "//has_images");                    
-                    var attr_results = StRWEvaluateXPath(results[0], "//@page");
+                    var results = StRFEvaluateXPath(data, "//has_images");                    
+                    var attr_results = StRFEvaluateXPath(results[0], "//@page");
                     if (results[0].textContent == 1)
                     {
                         STRF_LOG("has images for page: "+attr_results[0].textContent);
@@ -71,6 +69,7 @@ var StRFWebservice = function(apikey) {
             
             this._executeRequest(this._generateRequestUrl('images', [page_hash, 'list']), listener);
         },
+        */
         checkForMatches: function (images, callback)
         {
             STRF_LOG("Webservice::checkForMatches");
@@ -98,7 +97,7 @@ var StRFWebservice = function(apikey) {
                 hashes = images;
             }
             
-            this._executeRequest(this._generateRequestUrl('images', ['check']), listener, 'post', {
+            this._executeRequest(this._generateRequestUrl('check'), listener, 'post', {
                 images: hashes
             });
         },
@@ -115,10 +114,16 @@ var StRFWebservice = function(apikey) {
                     dump(data.documentElement.nodeName == "parsererror" ? "error while parsing\n" : data.documentElement.nodeName+"\n");
                     
                     if (callback !== undefined) {
-                        if (typeof callback == 'object') {                         
-                            callback[1].apply(callback[0], [data, status]);
+                        var extra_args = {};
+                        
+                        if (typeof callback == 'object') {
+                            if (typeof callback[2] !== 'undefined') {
+                                extra_args = callback[2];
+                            }
+                            
+                            callback[1].apply(callback[0], [data, status, extra_args]);
                         } else {
-                            callback.apply(callback, [data, status]);
+                            callback.apply(callback, [data, status, extra_args]);
                         }
                     }
                 }
@@ -200,8 +205,9 @@ var StRFWebservice = function(apikey) {
                 if (req.readyState == 4)
                 {
                     if (req.status == 200) {
-                        //req.responseXML | req.responseText
-                        listener.finished(req.responseXML, req.status);                     
+                        dump(req.status+"\n");
+                        dump(req.responseText+"\n");
+                        listener.finished(req.responseXML, req.status);
                     } else {
                         dump("Error loading page\n");
                         dump(req.status+"\n");
@@ -220,7 +226,7 @@ var StRFWebservice = function(apikey) {
             } catch (e) {
                 dump("Exception when sending request: \n");
                 dump(e);
-            }            
+            }
         }
     };
 }
