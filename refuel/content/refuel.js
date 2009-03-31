@@ -2,7 +2,7 @@ const STRF_EXTID = "st1refuel@noteitup.net";
 const STRF_EXTPREF_BRANCH = "extensions.refuel.";
 const STRF_DEVELOPMENT_MODE = true;
 
-const STRF_CAMPAIGN_URL = "http://noteitup.net/en/";
+const STRF_CAMPAIGN_URL = "http://refuel.nemein.net/";
 
 const STRF_EXT_PREFERENCES = Components.classes["@mozilla.org/preferences-service;1"]
                         .getService(Components.interfaces.nsIPrefService)
@@ -122,10 +122,6 @@ var refuel = {
         
         //Attach stylesheet for image replacements
         var uri = STRF_IO_SERVICE.newURI("chrome://refuel/skin/refuel.css", null, null);
-                
-        // var uri = STRF_LOCALFILE.createInstance(Components.interfaces.nsILocalFile);
-        // uri.initWithPath(STRF_EXT_PATH + STRF_FILE_SEPARATOR + "chrome" + STRF_FILE_SEPARATOR + 'skin' + STRF_FILE_SEPARATOR + 'refuel.js');
-        // ios.newURI("chrome://myext/content/myext.css", null, null);
         
         if (! STRF_STYLESHEET_SERVICE.sheetRegistered(uri, STRF_STYLESHEET_SERVICE.USER_SHEET)) {
             STRF_STYLESHEET_SERVICE.loadAndRegisterSheet(uri, STRF_STYLESHEET_SERVICE.USER_SHEET);
@@ -150,6 +146,8 @@ var refuel = {
         
         this.initialized = true;
         
+        this.syncLSWS();
+        
         STRF_TIMELINE.log("init() done");
     },
 
@@ -162,10 +160,12 @@ var refuel = {
     **/    
     uninit: function(e)
     {
+        STRF_LOG('uninit');
+        
         let target = this;
         
         gBrowser.removeProgressListener(StRFBrowserListener);
-        gBrowser.removeEventListener("load", function(e) { refuel.init(e); }, false);
+        gBrowser.removeEventListener("load", function(e) { target.init(e); }, false);
     },
 
     /**
@@ -220,6 +220,31 @@ var refuel = {
         STRF_LOG("doUpgrade");
         
         this.localstorage.prepareDatabase();
+    },
+    syncLSWS: function()
+    {
+        var unsynced = this.localstorage.getUnsynced();
+        
+        if (unsynced.length == 0) {
+            return;
+        }
+        
+        var extra_args = {
+            lsID: null
+        };
+        
+        for (let [i, imgData] in Iterator(unsynced))
+        {
+            var imageToBan = {
+                src: imgData.src,
+                hash: imgData.hash,
+                referer_hash: StRFUtils.md5_encode(imgData.refererurl),
+                referer_url: imgData.refererurl
+            };
+            
+            extra_args.lsID = imgData.id;
+            this.webservice.reportImage(imageToBan, [this, this._ws_report_cb, extra_args]);
+        }
     },
     processNewURL: function(aProgress, aURI)
     {
@@ -294,14 +319,20 @@ var refuel = {
         var matched_images = [];
         dump('current_url_images.length: '+this.current_url_images.length+"\n");
         
-        var has_images = StRWEvaluateXPath(data, "//has_images")[0].textContent;
+        // var has_images = StRFEvaluateXPath(data, "//has_images")[0].textContent;
+        // 
+        // if (! has_images) {
+        //     STRF_LOG("No images matched!");
+        //     return;
+        // }
         
-        if (! has_images) {
+        var results = StRFEvaluateXPath(data, "//images/img");
+        
+        if (results.length == 0) {
             STRF_LOG("No images matched!");
             return;
         }
         
-        var results = StRWEvaluateXPath(data, "//images/img");
         for (var i=0; i<results.length; i++)
         {
             var hash = results[i].attributes.getNamedItem("hash").textContent;
@@ -309,10 +340,14 @@ var refuel = {
             let banData = {
                 hash: hash,
                 src: results[i].attributes.getNamedItem("src").textContent,
-                weight: 0,//results[i].attributes.getNamedItem("weight").textContent
+                weight: results[i].attributes.getNamedItem("weight").textContent,
                 reporter_id: results[i].attributes.getNamedItem("reporter_id").textContent,
-                reporter_name: ''//results[i].attributes.getNamedItem("reporter_name").textContent
+                reporter_name: results[i].attributes.getNamedItem("reporter_name").textContent
             };
+            
+            if (banData.weight == '') {
+                banData.weight = 0;
+            }
             
             self._findMatchingImages(hash, matched_images, results.length, banData);
         }
@@ -344,32 +379,49 @@ var refuel = {
         
         //this.webservice.checkForMatches(this.current_url_images, [this, this._ws_check_cb]);
     },
-    _ws_report_cb: function(data, status)
+    _ws_report_cb: function(data, status, extra)
     {
         var self = this;
         var parsed_images = [];
         
-        var results = StRWEvaluateXPath(data, "//images/img");
+        var results = StRFEvaluateXPath(data, "//images/img");
         
-        for (var i=0; i<results.length; i++)
-        {
-            var hash = results[i].attributes.getNamedItem("hash").textContent;
-            
-            let banData = {
-                hash: hash,
-                src: results[i].attributes.getNamedItem("src").textContent,
-                weight: 0,//results[i].attributes.getNamedItem("weight").textContent
-                reporter_id: results[i].attributes.getNamedItem("reporter_id").textContent,
-                reporter_name: ''//results[i].attributes.getNamedItem("reporter_name").textContent
-            };
-            
-            STRF_LOG("Report response hash["+i+"]: "+hash);
-            STRF_LOG("Report response src["+i+"]: "+results[i].attributes.getNamedItem("src").textContent);
-            
-            self._findMatchingImages(hash, parsed_images, results.length, banData);
+        if (results.length == 0) {
+            return;
+        }
+        
+        var hash = results[0].attributes.getNamedItem("hash").textContent;
+        
+        let banData = {
+            hash: hash,
+            src: results[0].attributes.getNamedItem("src").textContent,
+            weight: results[0].attributes.getNamedItem("weight").textContent,
+            reporter_id: results[0].attributes.getNamedItem("reporter_id").textContent,
+            reporter_name: results[0].attributes.getNamedItem("reporter_name").textContent
+        };
+        
+        if (banData.weight == '') {
+            banData.weight = 0;
+        }
+        
+        STRF_LOG("Report response hash[0]: "+hash);
+        STRF_LOG("Report response src[0]: "+results[0].attributes.getNamedItem("src").textContent);
+        
+        self._findMatchingImages(hash, parsed_images, results.length, banData);
+        
+        if (parsed_images.length == 0) {
+            return;
         }
         
         STRF_LOG('parsed_images.length: '+parsed_images.length);
+        
+        if (typeof extra.lsID !== 'undefined') {
+            this.localstorage.updateBannedImage(extra.lsID, {
+                syn: true,
+                weight: banData.weight,
+                reporter_name: banData.reporter_name
+            });
+        }
         
         this._updatePageImages(parsed_images);
     },
@@ -377,9 +429,9 @@ var refuel = {
     {
         for (var x=0; x<this.current_url_images.length; x++)
         {
-            STRF_LOG("Report current_url_images x: "+x);
-            STRF_LOG("Report current_url_images hash["+x+"]: "+this.current_url_images[x].hash);
-            STRF_LOG("Report current_url_images src["+x+"]: "+this.current_url_images[x].src);
+            // STRF_LOG("Report current_url_images x: "+x);
+            // STRF_LOG("Report current_url_images hash["+x+"]: "+this.current_url_images[x].hash);
+            // STRF_LOG("Report current_url_images src["+x+"]: "+this.current_url_images[x].src);
             
             if (this.current_url_images[x].hash == hash) {
                 this.current_url_images[x].bd = banData;
@@ -541,11 +593,32 @@ var refuel = {
                 id: 0,
                 name: 'Reporter Name Here',
             },
+            refererurl: imageToBan.referer_url
         };
-        var lsStatus = this.localstorage.addBan(lsData);        
+        [lsStatus, banID] = this.localstorage.addBan(lsData);
+        
         STRF_LOG('Ban added to localstorage with status '+lsStatus);
         
-        this.webservice.reportImage(imageToBan, [this, this._ws_report_cb]);
+        var extra_args = {};
+        if (lsStatus) {
+            extra_args = {
+                lsID: banID
+            };
+        }
+        
+        this.webservice.reportImage(imageToBan, [this, this._ws_report_cb, extra_args]);
+        
+        // var banData = {
+        //     hash: imageToBan.hash,
+        //     src: imageToBan.src,
+        //     weight: 0,
+        //     reporter_id: lsData.reporter.id,
+        //     reporter_name: lsData.reporter.name
+        // };
+        // 
+        // var banned_images = [];
+        // this._findMatchingImages(imageToBan.hash, banned_images, 1, banData);
+        // this._updatePageImages(banned_images);
     },
     _updateStatusImage: function()
     {
