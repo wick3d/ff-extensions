@@ -46,28 +46,31 @@
         <stringbundle id="refuel-strings" src="chrome://refuel/locale/refuel.properties"/>
     </stringbundleset>
 
-    <menupopup id="menu_ToolsPopup">
+    <!-- <menupopup id="menu_ToolsPopup">
         <menuitem id="refuel-hello" label="&refuel.label;" 
             oncommand="refuel.onMenuItemCommand(event);"/>
-    </menupopup>
+    </menupopup> -->
     
     <popup id="contentAreaContextMenu">
-        <menu class="menu" id="ctx-refuel-main" 
+        <!-- <menu class="menu" id="ctx-refuel-main" 
             insertafter="context-stop" 
-            label="&refuelContext.label;">
-            <menupopup>
+            label="&refuelContext.label;"> -->
+            <!-- <menupopup id="ctx-refuel-main" insertafter="context-stop"> -->
                 <menuitem id="ctx-refuel-main-ban" label="&refuelActions.ban_image;" 
+                    image="chrome://refuel/skin/status-on.png"                    
                     tooltiptex="&refuelTooltips.ban_image;"
                     accesskey="&refuelAccesskeys.ban_image;" 
-                    oncommand="refuel.banImage(event);" />
-            </menupopup>
-        </menu>
+                    oncommand="refuel.banImage(event);"
+                    insertafter="context-sep-properties"
+                />
+            <!-- </menupopup> -->
+        <!-- </menu> -->
     </popup>
     
-    <statusbar id='refuelStatusBar'>
-    	<statusbarpanel id='refuelStatusBarPanel' insertafter='livemark-button'>
+    <statusbar id='status-bar'>
+    	<statusbarpanel id='refuelStatusBarPanel' mousethrough="never" insertbefore='resizerBottomRight'>
     		<image id='refuelStatusBarPanelImage' width='16' height='16'
-    			src='chrome://refuel/skin/status-on.png'
+    			src='chrome://refuel/skin/RE_16x16_green.png'
     			onclick="refuel.toggleStatus();"
     		/>
     	</statusbarpanel>
