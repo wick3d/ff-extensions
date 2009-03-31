@@ -1,0 +1,6 @@
+<!ENTITY prefwindow.title "ReFuel -ominaisuudet">
+<!ENTITY pane1.title "ReFuel asetukset">
+<!ENTITY enabledpref.label "Käytössä?">
+<!ENTITY enabledpref.accesskey "E">
+<!ENTITY apikeypref.label "API -avain">
+<!ENTITY apikey.accesskey "A">

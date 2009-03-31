@@ -1,0 +1,8 @@
+<!ENTITY refuel.label "ReFuel menuitem">
+<!ENTITY refuelContext.label "ReFuel tools">
+<!ENTITY refuelContext.accesskey "B">
+<!ENTITY refuelToolbar.label "ReFuel Toolbar">
+<!ENTITY refuelToolbar.tooltip "Toolbar button tooltip">
+<!ENTITY refuelActions.ban_image "Ilmoita tämä kuva">
+<!ENTITY refuelTooltips.ban_image "Siivoaa kyseisen kuvan">
+<!ENTITY refuelAccesskeys.ban_image "I">
