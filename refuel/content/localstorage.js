@@ -3,12 +3,13 @@ const STRF_STORAGESERVICE = Components.classes["@mozilla.org/storage/service;1"]
 
 var StRFLocalStorage = function(apikey)
 {
+    var _inited = false;    
     var _apikey = apikey;
     
     var _tables = {
         images: {
             since_version: '0.2',
-            schema: 'id INTEGER PRIMARY KEY, hash LONGVARCHAR, src LONGVARCHAR, weight INTEGER DEFAULT 0 NOT NULL, reporter_name VARCHAR'//,
+            schema: 'id INTEGER PRIMARY KEY, hash LONGVARCHAR, src LONGVARCHAR, weight INTEGER DEFAULT 0 NOT NULL, reporter_name VARCHAR, refererurl LONGVARCHAR, syn INTEGER DEFAULT 0 NOT NULL'//,
             // schema_updates: {
             //     '0.3': 'DROP COLUMN reporter_id'
             // }
@@ -37,10 +38,17 @@ var StRFLocalStorage = function(apikey)
             STRF_LOG('storage_file path: '+this.storage_file.path);
             
             this.storage = STRF_STORAGESERVICE.openDatabase(this.storage_file);
+            
+            _inited = true;
+            
             STRF_TIMELINE.log("StRFLocalStorage::init() finished");
         },
         prepareDatabase: function()
-        {            
+        {
+            if (! _inited) {
+                this.init();
+            }
+            
             for (var tablename in _tables)
             {
                 STRF_LOG('Check existance of table '+tablename);
@@ -96,21 +104,31 @@ var StRFLocalStorage = function(apikey)
                 weight = data.weight;
             }
             
-            var statement = this.storage.createStatement("INSERT INTO images (hash, src, weight, reporter_name) VALUES (?1, ?2, ?3, ?4)");
+            var statement = this.storage.createStatement("INSERT INTO images (hash, src, weight, reporter_name, refererurl, syn) VALUES (?1, ?2, ?3, ?4, ?5, 0)");
             statement.bindUTF8StringParameter(0, data.hash);
             statement.bindUTF8StringParameter(1, data.src);
             statement.bindInt32Parameter(2, weight);
             statement.bindUTF8StringParameter(3, data.reporter.name);
+            statement.bindUTF8StringParameter(4, data.refererurl);
             
-            try {
-                var status = this._executeStatement(statement);
-                //TODO: IF status == -1, execute later
-            } finally {
-                statement.reset();
-            }
+            var status = this._executeStatement(statement);
+            //TODO: IF status == -1, execute later
             
             var row_id = this.storage.lastInsertRowID;            
             STRF_LOG('New ban successfully added to local storage with id '+row_id);
+            
+            return [status, row_id];
+        },
+        updateBannedImage: function(id, data)
+        {
+            var statement = this.storage.createStatement("UPDATE images SET syn = ?2, weight = ?3, reporter_name = ?4 WHERE id = ?1");
+            statement.bindInt32Parameter(0, id);
+            statement.bindInt32Parameter(1, (status ? 1 : 0));
+            statement.bindInt32Parameter(2, (data.weight ? data.weight : 0));
+            statement.bindUTF8StringParameter(3, (data.reporter_name ? data.reporter_name : ''));
+            
+            var status = this._executeStatement(statement);
+            //TODO: If status == -1, execute later
             
             return status;
         },
@@ -128,6 +146,8 @@ var StRFLocalStorage = function(apikey)
                 return false;
             } catch (e) {
                 return e;
+            } finally {
+                statement.reset();
             }
             
             this.storage.commitTransaction();
@@ -203,6 +223,32 @@ var StRFLocalStorage = function(apikey)
                     callback.apply(callback, [data, status]);
                 }
             }
+        },
+        getUnsynced: function()
+        {
+            STRF_LOG("StRFLocalStorage::getUnsynced");
+            
+            var self = this;
+            var data = [];
+
+            var statement = this.storage.createStatement("SELECT id,hash,weight,reporter_name,src,refererurl FROM images WHERE syn = 0");
+            
+            try {
+                while (statement.executeStep()) {
+                    data.push({
+                        id: statement.getInt32(0),
+                        hash: statement.getUTF8String(1),
+                        weight: statement.getInt32(2),
+                        reporter_name: statement.getUTF8String(3),
+                        src: statement.getUTF8String(4),
+                        refererurl: statement.getUTF8String(5),
+                    });
+                }
+            } finally {
+                statement.reset();
+            }
+            
+            return data;
         }
     };
 }
