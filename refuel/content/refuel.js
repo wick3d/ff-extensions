@@ -196,10 +196,6 @@ var refuel = {
                 STRF_EXT_PREFERENCES.setCharPref("version", currentVersion);
 
                 this.doFirstRun();
-
-                window.setTimeout(function() {
-                    gBrowser.selectedTab = gBrowser.addTab("http://noteitup.net/");
-                }, 1500);
             }
 
             if (ver != currentVersion && !firstRun)
@@ -212,6 +208,10 @@ var refuel = {
     doFirstRun: function()
     {
         STRF_LOG("doFirstRun");
+        
+        window.setTimeout(function() {
+            gBrowser.selectedTab = gBrowser.addTab(STRF_CAMPAIGN_URL);
+        }, 1500);
         
         this.localstorage.prepareDatabase();
     },
