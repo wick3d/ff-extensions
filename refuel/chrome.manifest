@@ -1,4 +1,5 @@
 content	refuel	content/
 locale	refuel	en-US	locale/en-US/
+locale	refuel	fi-FI	locale/fi-FI/
 skin	refuel	classic/1.0	skin/
 overlay	chrome://browser/content/browser.xul	chrome://refuel/content/overlay.xul
